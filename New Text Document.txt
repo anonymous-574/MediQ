@@ -1,0 +1,152 @@
+api_reference.md
+# MediQ API Reference (selected endpoints & example outputs)
+
+Base URL: http://127.0.0.1:5000
+
+---
+
+## 1) POST /api/auth/register
+**Input**
+```json
+{
+  "name": "Patient A",
+  "email": "pa@example.com",
+  "password": "pass123",
+  "role": "patient"
+}
+Output (201)
+
+{
+  "message": "User registered",
+  "user_id": 5
+}
+2) POST /api/auth/login
+
+Input
+
+{"email":"john@example.com","password":"password"}
+
+
+Output
+
+{
+  "access_token": "<JWT>",
+  "user_id": 3,
+  "role": "patient"
+}
+Use the token in headers: Authorization: Bearer <JWT>
+3) POST /api/patient/register
+
+Input
+
+{
+  "name": "Jane",
+  "email": "jane@example.com",
+  "dob": "2000-01-01",
+  "medical_history": "None"
+}
+
+
+Output
+
+{
+  "message": "Registration successful",
+  "patient_id": "P-1234567890"
+}
+
+4) POST /api/patient/submit_symptoms
+
+Headers: Authorization: Bearer <JWT-of-patient>
+Input
+
+{"symptoms":"Fever and cough for 2 days"}
+
+
+Output
+
+{
+  "message":"Symptoms analyzed",
+  "report_id":"SR-169...",
+  "urgency":"Medium",
+  "classification":"Possible infection",
+  "recommendations":["Book an appointment with a physician","Isolate and monitor symptoms"]
+}
+
+5) POST /api/patient/book_appointment
+
+Headers: Authorization: Bearer <JWT-of-patient>
+Input
+
+{
+  "doctor_id": 2,
+  "hospital_id": 1,
+  "date_time": "2025-10-24 10:00"
+}
+
+
+Output (201)
+
+{
+  "message":"Appointment booked",
+  "appointment_id":"APPT-169...",
+  "status":"Scheduled",
+  "date_time":"2025-10-24 10:00"
+}
+
+6) GET /api/doctor/appointments
+
+Headers: Authorization: Bearer <JWT-of-doctor>
+Query: none
+Output
+
+[
+  {
+    "appointment_id":"APPT-169...",
+    "patient_id": 3,
+    "status":"Scheduled",
+    "date_time":"2025-10-24 10:00",
+    "notes": null
+  }
+]
+
+7) PUT /api/doctor/update_status
+
+Headers: Authorization: Bearer <JWT-of-doctor>
+Input
+
+{"appointment_id":"APPT-169...","status":"Completed"}
+
+
+Output
+
+{"message":"Status updated","appointment_id":"APPT-169...","status":"Completed"}
+
+8) PUT /api/hospital/update_congestion
+
+Headers: Authorization: Bearer <JWT-of-admin>
+Input
+
+{"hospital_id":"HOSP-1","congestion":0.7}
+
+
+Output
+
+{"message":"Congestion updated","hospital_id":"HOSP-1","congestion":0.7}
+
+9) GET /api/hospital/predict_wait_time?hospital_id=1&department=general
+
+Output
+
+{"hospital_id":"1","department":"general","predicted_wait_minutes":35}
+
+10) POST /api/patient/submit_queue_report
+
+Headers: Authorization: Bearer <JWT-of-patient>
+Input
+
+{"hospital_id":1,"queue_length":40,"wait_time":60,"department":"OPD"}
+
+
+Output
+
+{"message":"Queue report submitted","report_id":"QR-169..."}

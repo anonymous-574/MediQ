@@ -1,0 +1,5 @@
+Flask==2.3.2
+Flask_SQLAlchemy==3.0.3
+Flask_Cors==4.0.1
+PyJWT==2.8.0
+passlib==1.7.4
