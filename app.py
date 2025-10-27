@@ -5,6 +5,7 @@ from database import db  # ✅ Import db from database.py
 def create_app():
     app = Flask(__name__)
     CORS(app)
+    CORS(app, origins=["http://localhost:3000"]) 
 
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False

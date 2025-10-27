@@ -35,22 +35,43 @@ def book_appointment(patient_id, doctor_id, hospital_id, date_time):
     patient = Patient.query.get(patient_id)
     if not patient:
         return {"error": "Patient not found"}
-    from models import Doctor
-    doctor = Doctor.query.get(doctor_id)
+
+    # Attempt to find doctor by either numeric id or string doctor_id
+    try:
+        doctor_id_int = int(doctor_id)
+    except (TypeError, ValueError):
+        doctor_id_int = None
+
+    doctor = Doctor.query.filter(
+        (Doctor.id == doctor_id_int) | (Doctor.doctor_id == str(doctor_id))
+    ).first()
+
     if not doctor:
+        print(f"DEBUG: No doctor found for doctor_id={doctor_id}")
         return {"error": "Doctor not found"}
-    valid, reason = validate_booking_rules(patient, doctor_id, date_time)
+
+    # Validate business rules
+    valid, reason = validate_booking_rules(patient, doctor.id, date_time)
     if not valid:
         return {"error": reason}
+
+    # Create appointment
     appt = Appointment(
-        appointment_id = f"APPT-{int(time.time())}",
-        patient_id = patient_id,
-        doctor_id = doctor_id,
-        hospital_id = hospital_id,
-        date_time = date_time,
-        status = "Scheduled"
+        appointment_id=f"APPT-{int(time.time())}",
+        patient_id=patient_id,
+        doctor_id=doctor.id,  # always use the internal numeric ID
+        hospital_id=hospital_id,
+        date_time=date_time,
+        status="Scheduled"
     )
+
     db.session.add(appt)
     db.session.commit()
-    # Simple notification stub (in prod use NotificationService)
-    return {"message": "Appointment booked", "appointment_id": appt.appointment_id, "status": appt.status, "date_time": appt.date_time}
+
+    return {
+        "message": "Appointment booked",
+        "appointment_id": appt.appointment_id,
+        "status": appt.status,
+        "date_time": appt.date_time
+    }
+

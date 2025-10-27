@@ -82,8 +82,8 @@ class TimeSlot(db.Model):
     slot_id = db.Column(db.String(50), unique=True)
     doctor_id = db.Column(db.Integer)
     hospital_id = db.Column(db.Integer, db.ForeignKey('hospital.id'))
-    start_time = db.Column(db.String(50))
-    end_time = db.Column(db.String(50))
+    start_time = db.Column(db.DateTime)
+    end_time = db.Column(db.DateTime)
     is_available = db.Column(db.Boolean, default=True)
     slot_type = db.Column(db.String(50), default='consult')
 
@@ -108,6 +108,8 @@ class Appointment(db.Model):
     appointment_type = db.Column(db.String(50), default='OPD')
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    doctor = db.relationship('Doctor', backref='appointments', lazy=True)
+    hospital = db.relationship('Hospital', backref='appointments', lazy=True)
 
 class SymptomReport(db.Model):
     id = db.Column(db.Integer, primary_key=True)
