@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, current_app
 from database import db
 
-from models import User, Patient, Doctor, HospitalAdministrator
+from models import User, Patient, Doctor, HospitalAdministrator,Nurse
 from passlib.hash import pbkdf2_sha256
 from auth import generate_jwt
 
@@ -20,7 +20,9 @@ def register():
 
     # create based on role
     pwd = pbkdf2_sha256.hash(data.get('password'))
-    if role == 'patient':
+    if role == 'nurse':
+        u = Nurse(name=data.get('name'), email=data.get('email'), phone=data.get('phone'), password_hash=pwd)
+    elif role == 'patient':
         u = Patient(name=data.get('name'), email=data.get('email'), phone=data.get('phone'), password_hash=pwd)
     elif role == 'doctor':
         u = Doctor(name=data.get('name'), email=data.get('email'), phone=data.get('phone'), password_hash=pwd, specialty=data.get('specialty'))

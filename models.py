@@ -52,6 +52,53 @@ class Nurse(User):
 
     __mapper_args__ = {'polymorphic_identity': 'nurse'}
 
+# ===================== Room Management =====================
+
+class Room(db.Model):
+    __tablename__ = 'room'
+
+    id = db.Column(db.Integer, primary_key=True)
+    room_id = db.Column(db.String(50), unique=True, nullable=False)
+    room_number = db.Column(db.String(20), nullable=False)
+    status = db.Column(db.String(50), default='available')  # available, occupied, cleaning
+    patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'), nullable=True)
+    patient_name = db.Column(db.String(100))
+    department = db.Column(db.String(100), default='General Medicine')
+    floor = db.Column(db.Integer)
+
+    def to_dict(self):
+        return {
+            "room_id": self.room_id,
+            "room_number": self.room_number,
+            "status": self.status,
+            "patient_id": self.patient_id,
+            "patient_name": self.patient_name,
+            "department": self.department,
+            "floor": self.floor
+        }
+# ===================== Nurse Tasks =====================
+
+class Task(db.Model):
+    __tablename__ = 'task'
+
+    id = db.Column(db.Integer, primary_key=True)
+    task_id = db.Column(db.String(50), unique=True, nullable=False)
+    nurse_id = db.Column(db.Integer, db.ForeignKey('nurse.id'))
+    room_id = db.Column(db.String(50), db.ForeignKey('room.room_id'))
+    description = db.Column(db.String(255))
+    status = db.Column(db.String(50), default='pending')  # pending, completed
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "task_id": self.task_id,
+            "nurse_id": self.nurse_id,
+            "room_id": self.room_id,
+            "description": self.description,
+            "status": self.status,
+            "created_at": str(self.created_at)
+        }
+
 class HospitalAdministrator(User):
     __tablename__ = 'hospital_admin'
     id = db.Column(db.Integer, db.ForeignKey('user.id'), primary_key=True)

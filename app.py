@@ -25,13 +25,13 @@ def create_app():
     from routes.hospital_routes import hospital_bp
     from routes.admin_routes import admin_bp
     from routes.auth_routes import auth_bp
-
+    from routes.nurse_routes import nurse_bp
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(patient_bp, url_prefix='/api/patient')
     app.register_blueprint(doctor_bp, url_prefix='/api/doctor')
     app.register_blueprint(hospital_bp, url_prefix='/api/hospital')
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
-
+    app.register_blueprint(nurse_bp, url_prefix="/api/nurse")
     with app.app_context():
         db.create_all()
 
