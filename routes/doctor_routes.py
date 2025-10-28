@@ -57,15 +57,147 @@ def update_status(user):
     db.session.commit()
     return jsonify({"message": "Status updated", "appointment_id": a.appointment_id, "status": a.status}), 200
 
-@doctor_bp.route('/available_slots/<doctor_id>', methods=['GET'])
+# -----------------------------------------------------------
+# PUT /doctor/update_availability
+# -----------------------------------------------------------
+@doctor_bp.route('/update_availability', methods=['PUT'])
+@role_required('doctor')
+def update_availability(user):
+    data = request.get_json()
+    timeslots = data if isinstance(data, list) else data.get('timeslots', [])
+
+    # ✅ user.id is the doctor's id (from user table, same as doctor.id)
+    doctor = Doctor.query.filter_by(id=user.id).first()
+    if not doctor:
+        return jsonify({"error": "Doctor not found"}), 404
+
+    created, skipped = [], []
+
+    for ts in timeslots:
+        try:
+            date_str = ts.get('date')
+            start_time_str = ts.get('start_time')
+            end_time_str = ts.get('end_time')
+
+            if not (date_str and start_time_str and end_time_str):
+                skipped.append({
+                    "slot_id": ts.get("slot_id"),
+                    "reason": "Missing required fields (date/start_time/end_time)"
+                })
+                continue
+
+            start_dt = datetime.strptime(f"{date_str} {start_time_str}", "%Y-%m-%d %H:%M")
+            end_dt = datetime.strptime(f"{date_str} {end_time_str}", "%Y-%m-%d %H:%M")
+
+            # ✅ Generate unique slot ID
+            slot_id = ts.get('slot_id') or f"TS-{user.id}-{int(time.time())}"
+
+            # ✅ Check for existing slot
+            existing = TimeSlot.query.filter_by(
+                slot_id=slot_id,
+                doctor_id=user.id
+            ).first()
+
+            if existing:
+                skipped.append({
+                    "slot_id": slot_id,
+                    "reason": "Already exists"
+                })
+                continue
+
+            # ✅ Create new slot with doctor_id as INTEGER
+            slot = TimeSlot(
+                slot_id=slot_id,
+                doctor_id=user.id,  # INTEGER foreign key
+                hospital_id=doctor.hospital_id,
+                start_time=start_dt,
+                end_time=end_dt,
+                is_available=True,
+                slot_type='consultation'
+            )
+
+            db.session.add(slot)
+            created.append(slot.slot_id)
+
+        except ValueError as e:
+            skipped.append({
+                "slot_id": ts.get("slot_id"),
+                "reason": f"Invalid datetime format: {str(e)}"
+            })
+
+        except Exception as e:
+            skipped.append({
+                "slot_id": ts.get("slot_id"),
+                "reason": f"Unexpected error: {str(e)}"
+            })
+
+    db.session.commit()
+
+    return jsonify({
+        "message": "Availability updated successfully",
+        "created_slots": created,
+        "skipped_slots": skipped
+    }), 201
+
+# -----------------------------------------------------------
+# DELETE /doctor/delete_slot
+# -----------------------------------------------------------
+@doctor_bp.route('/delete_slot', methods=['DELETE'])
+@role_required('doctor')
+def delete_slot(user):
+    data = request.get_json(silent=True) or {}
+    slot_id = data.get("slot_id")
+
+    # ✅ Use user.id directly (it's the doctor's id)
+    slot = TimeSlot.query.filter_by(slot_id=slot_id, doctor_id=user.id).first()
+    if not slot:
+        return jsonify({"error": f"Slot {slot_id} not found or not owned by this doctor"}), 404
+
+    db.session.delete(slot)
+    db.session.commit()
+    return jsonify({"message": f"Slot {slot_id} deleted successfully"}), 200
+
+# -----------------------------------------------------------
+# GET /doctor/availability
+# -----------------------------------------------------------
+@doctor_bp.route('/availability', methods=['GET'])
+@role_required('doctor')
+def get_availability(user):
+    # ✅ Query slots by user.id (which is the doctor_id in time_slot table)
+    slots = TimeSlot.query.filter_by(doctor_id=user.id).all()
+
+    output = []
+    for s in slots:
+        # ✅ Format to match frontend expectations
+        if isinstance(s.start_time, str):
+            start_dt = datetime.fromisoformat(s.start_time.replace('Z', '+00:00'))
+            end_dt = datetime.fromisoformat(s.end_time.replace('Z', '+00:00'))
+        else:
+            start_dt = s.start_time
+            end_dt = s.end_time
+        
+        output.append({
+            "slot_id": s.slot_id,
+            "date": start_dt.strftime("%Y-%m-%d"),           # ✅ Separate date field
+            "start_time": start_dt.strftime("%H:%M"),        # ✅ Time only
+            "end_time": end_dt.strftime("%H:%M"),            # ✅ Time only
+            "is_available": s.is_available,
+            "slot_type": s.slot_type,
+            "hospital_id": s.hospital_id
+        })
+
+    return jsonify(output), 200
+
+# -----------------------------------------------------------
+# GET /doctor/available_slots/<doctor_id>?date=YYYY-MM-DD
+# For patients booking appointments
+# -----------------------------------------------------------
+@doctor_bp.route('/available_slots/<int:doctor_id>', methods=['GET'])
 def get_available_slots(doctor_id):
     """
     Get available time slots for a specific doctor on a specific date
     Used by patients when booking appointments
     """
-    from flask import request
-    from datetime import datetime, timedelta
-    
     # Get the date from query parameters
     date_str = request.args.get('date')
     if not date_str:
@@ -114,145 +246,50 @@ def get_available_slots(doctor_id):
         "doctor_id": doctor_id,
         "total_slots": len(available_slots)
     }), 200
+
 # -----------------------------------------------------------
-# PUT /doctor/update_availability
+# GET /doctor/patients
 # -----------------------------------------------------------
-@doctor_bp.route('/update_availability', methods=['PUT'])
+@doctor_bp.route('/patients', methods=['GET'])
 @role_required('doctor')
-def update_availability(user):
-    data = request.get_json()
-    timeslots = data if isinstance(data, list) else data.get('timeslots', [])
-
-    # ✅ Use doctor.id (integer)
-    doctor = Doctor.query.filter_by(id=user.id).first()
-    if not doctor:
-        return jsonify({"error": "Doctor not found"}), 404
-
-    created, skipped = [], []
-
-    for ts in timeslots:
-        try:
-            date_str = ts.get('date')
-            start_time_str = ts.get('start_time')
-            end_time_str = ts.get('end_time')
-
-            if not (date_str and start_time_str and end_time_str):
-                skipped.append({
-                    "slot_id": ts.get("slot_id"),
-                    "reason": "Missing required fields (date/start_time/end_time)"
-                })
-                continue
-
-            from datetime import datetime
-            import time
-
-            start_dt = datetime.strptime(f"{date_str} {start_time_str}", "%Y-%m-%d %H:%M")
-            end_dt = datetime.strptime(f"{date_str} {end_time_str}", "%Y-%m-%d %H:%M")
-
-            # ✅ Generate unique slot ID
-            slot_id = ts.get('slot_id') or f"TS-{doctor.id}-{int(time.time())}"
-
-            # ✅ Check for existing slot by integer doctor_id
-            existing = TimeSlot.query.filter_by(
-                slot_id=slot_id,
-                doctor_id=doctor.id
-            ).first()
-
-            if existing:
-                skipped.append({
-                    "slot_id": slot_id,
-                    "reason": "Already exists"
-                })
-                continue
-
-            # ✅ Store integer doctor.id in DB
-            slot = TimeSlot(
-                slot_id=slot_id,
-                doctor_id=doctor.id,
-                hospital_id=doctor.hospital_id,
-                start_time=start_dt,
-                end_time=end_dt,
-                is_available=True,
-                slot_type='consultation'
-            )
-
-            db.session.add(slot)
-            created.append(slot.slot_id)
-
-        except ValueError as e:
-            skipped.append({
-                "slot_id": ts.get("slot_id"),
-                "reason": f"Invalid datetime format: {str(e)}"
+def get_doctor_patients(user):
+    """
+    Get all unique patients who have appointments with this doctor
+    """
+    from sqlalchemy import distinct
+    
+    # Get distinct patient IDs from appointments
+    patient_ids = db.session.query(distinct(Appointment.patient_id)).filter(
+        Appointment.doctor_id == user.id
+    ).all()
+    
+    patients = []
+    for (patient_id,) in patient_ids:
+        patient = Patient.query.filter_by(id=patient_id).first()
+        if patient:
+            user_info = patient.user  # Get related user info
+            
+            # Count appointments
+            total_appointments = Appointment.query.filter_by(
+                patient_id=patient_id,
+                doctor_id=user.id
+            ).count()
+            
+            # Get last visit
+            last_appointment = Appointment.query.filter_by(
+                patient_id=patient_id,
+                doctor_id=user.id
+            ).order_by(Appointment.created_at.desc()).first()
+            
+            patients.append({
+                "patient_id": patient.patient_id,
+                "patient_name": user_info.name,
+                "name": user_info.name,
+                "email": user_info.email,
+                "phone": user_info.phone,
+                "status": "Active" if patient.account_status == "active" else "Inactive",
+                "total_appointments": total_appointments,
+                "last_visit": last_appointment.date_time if last_appointment else None
             })
-
-        except Exception as e:
-            skipped.append({
-                "slot_id": ts.get("slot_id"),
-                "reason": f"Unexpected error: {str(e)}"
-            })
-
-    db.session.commit()
-
-    return jsonify({
-        "message": "Availability updated successfully",
-        "created_slots": created,
-        "skipped_slots": skipped
-    }), 201
-
-# -----------------------------------------------------------
-# DELETE /doctor/delete_slot
-# -----------------------------------------------------------
-@doctor_bp.route('/delete_slot', methods=['DELETE'])
-@role_required('doctor')
-def delete_slot(user):
-    data = request.get_json(silent=True) or {}
-    slot_id = data.get("slot_id")
-
-    doctor = Doctor.query.filter_by(id=user.id).first()
-    if not doctor:
-        return jsonify({"error": "Doctor not found"}), 404
-
-    # ✅ Use integer doctor.id here
-    slot = TimeSlot.query.filter_by(slot_id=slot_id, doctor_id=doctor.id).first()
-    if not slot:
-        return jsonify({"error": f"Slot {slot_id} not found or not owned by this doctor"}), 404
-
-    db.session.delete(slot)
-    db.session.commit()
-    return jsonify({"message": f"Slot {slot_id} deleted successfully"}), 200
-
-# -----------------------------------------------------------
-# GET /doctor/availability
-# -----------------------------------------------------------
-@doctor_bp.route('/availability', methods=['GET'])
-@role_required('doctor')
-def get_availability(user):
-    # Find the doctor record linked to this user
-    doctor = Doctor.query.filter_by(id=user.id).first()
-    if not doctor:
-        return jsonify({"error": "Doctor not found"}), 404
-
-    # Query by doctor.id (integer FK)
-    slots = TimeSlot.query.filter_by(doctor_id=doctor.id).all()
-
-    output = []
-    for s in slots:
-        # ✅ Format to match frontend expectations
-        if isinstance(s.start_time, str):
-            start_dt = datetime.fromisoformat(s.start_time.replace('Z', '+00:00'))
-            end_dt = datetime.fromisoformat(s.end_time.replace('Z', '+00:00'))
-        else:
-            start_dt = s.start_time
-            end_dt = s.end_time
-        
-        output.append({
-            "slot_id": s.slot_id,
-            "date": start_dt.strftime("%Y-%m-%d"),           # ✅ Separate date field
-            "start_time": start_dt.strftime("%H:%M"),        # ✅ Time only
-            "end_time": end_dt.strftime("%H:%M"),            # ✅ Time only
-            "is_available": s.is_available,
-            "slot_type": s.slot_type,
-            "hospital_id": s.hospital_id
-        })
-
-    return jsonify(output), 200
+    
+    return jsonify(patients), 200
