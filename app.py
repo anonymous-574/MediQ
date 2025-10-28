@@ -1,6 +1,8 @@
 from flask import Flask, jsonify
 from flask_cors import CORS
 from database import db 
+from dotenv import load_dotenv
+import os
 
 def create_app():
     load_dotenv()
