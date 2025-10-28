@@ -66,12 +66,10 @@ def update_availability(user):
     data = request.get_json()
     timeslots = data if isinstance(data, list) else data.get('timeslots', [])
 
-    # ✅ Find the actual doctor record (doctor.id references user.id)
+    # ✅ Use doctor.id (integer)
     doctor = Doctor.query.filter_by(id=user.id).first()
     if not doctor:
         return jsonify({"error": "Doctor not found"}), 404
-
-    doctor_identifier = doctor.doctor_id  # use this for all time_slot relations
 
     created, skipped = [], []
 
@@ -81,7 +79,6 @@ def update_availability(user):
             start_time_str = ts.get('start_time')
             end_time_str = ts.get('end_time')
 
-            # Validate required fields
             if not (date_str and start_time_str and end_time_str):
                 skipped.append({
                     "slot_id": ts.get("slot_id"),
@@ -89,20 +86,19 @@ def update_availability(user):
                 })
                 continue
 
-            # ✅ Combine date + time strings into proper datetimes
             from datetime import datetime
             import time
 
             start_dt = datetime.strptime(f"{date_str} {start_time_str}", "%Y-%m-%d %H:%M")
             end_dt = datetime.strptime(f"{date_str} {end_time_str}", "%Y-%m-%d %H:%M")
 
-            # ✅ Determine slot_id (use provided one or generate unique)
-            slot_id = ts.get('slot_id') or f"TS-{doctor_identifier}-{int(time.time())}"
+            # ✅ Generate unique slot ID
+            slot_id = ts.get('slot_id') or f"TS-{doctor.id}-{int(time.time())}"
 
-            # ✅ Skip existing slots with same slot_id and doctor_id
+            # ✅ Check for existing slot by integer doctor_id
             existing = TimeSlot.query.filter_by(
                 slot_id=slot_id,
-                doctor_id=doctor_identifier
+                doctor_id=doctor.id
             ).first()
 
             if existing:
@@ -112,10 +108,10 @@ def update_availability(user):
                 })
                 continue
 
-            # ✅ Create and store new slot
+            # ✅ Store integer doctor.id in DB
             slot = TimeSlot(
                 slot_id=slot_id,
-                doctor_id=doctor_identifier,
+                doctor_id=doctor.id,
                 hospital_id=doctor.hospital_id,
                 start_time=start_dt,
                 end_time=end_dt,
