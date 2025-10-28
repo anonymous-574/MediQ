@@ -57,6 +57,63 @@ def update_status(user):
     db.session.commit()
     return jsonify({"message": "Status updated", "appointment_id": a.appointment_id, "status": a.status}), 200
 
+@doctor_bp.route('/available_slots/<doctor_id>', methods=['GET'])
+def get_available_slots(doctor_id):
+    """
+    Get available time slots for a specific doctor on a specific date
+    Used by patients when booking appointments
+    """
+    from flask import request
+    from datetime import datetime, timedelta
+    
+    # Get the date from query parameters
+    date_str = request.args.get('date')
+    if not date_str:
+        return jsonify({"error": "Date parameter is required"}), 400
+    
+    try:
+        # Parse the date
+        target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return jsonify({"error": "Invalid date format. Use YYYY-MM-DD"}), 400
+    
+    # Query time slots for this doctor on this date
+    # Filter by date range (start of day to end of day)
+    start_of_day = datetime.combine(target_date, datetime.min.time())
+    end_of_day = datetime.combine(target_date, datetime.max.time())
+    
+    slots = TimeSlot.query.filter(
+        TimeSlot.doctor_id == doctor_id,
+        TimeSlot.is_available == True,
+        TimeSlot.start_time >= start_of_day,
+        TimeSlot.start_time <= end_of_day
+    ).order_by(TimeSlot.start_time).all()
+    
+    available_slots = []
+    for slot in slots:
+        # Format datetime objects to ISO strings for frontend
+        if isinstance(slot.start_time, str):
+            start_dt = datetime.fromisoformat(slot.start_time.replace('Z', '+00:00'))
+            end_dt = datetime.fromisoformat(slot.end_time.replace('Z', '+00:00'))
+        else:
+            start_dt = slot.start_time
+            end_dt = slot.end_time
+        
+        available_slots.append({
+            "slot_id": slot.slot_id,
+            "start_time": start_dt.isoformat(),  # ISO format for formatTime() function
+            "end_time": end_dt.isoformat(),      # ISO format for formatTime() function
+            "date": start_dt.strftime("%Y-%m-%d"),
+            "is_available": slot.is_available,
+            "slot_type": slot.slot_type
+        })
+    
+    return jsonify({
+        "available_slots": available_slots,
+        "date": date_str,
+        "doctor_id": doctor_id,
+        "total_slots": len(available_slots)
+    }), 200
 # -----------------------------------------------------------
 # PUT /doctor/update_availability
 # -----------------------------------------------------------
@@ -180,10 +237,19 @@ def get_availability(user):
 
     output = []
     for s in slots:
+        # ✅ Format to match frontend expectations
+        if isinstance(s.start_time, str):
+            start_dt = datetime.fromisoformat(s.start_time.replace('Z', '+00:00'))
+            end_dt = datetime.fromisoformat(s.end_time.replace('Z', '+00:00'))
+        else:
+            start_dt = s.start_time
+            end_dt = s.end_time
+        
         output.append({
             "slot_id": s.slot_id,
-            "start_time": s.start_time,
-            "end_time": s.end_time,
+            "date": start_dt.strftime("%Y-%m-%d"),           # ✅ Separate date field
+            "start_time": start_dt.strftime("%H:%M"),        # ✅ Time only
+            "end_time": end_dt.strftime("%H:%M"),            # ✅ Time only
             "is_available": s.is_available,
             "slot_type": s.slot_type,
             "hospital_id": s.hospital_id
