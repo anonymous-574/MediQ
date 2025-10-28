@@ -155,15 +155,13 @@ def delete_slot(user):
     if not doctor:
         return jsonify({"error": "Doctor not found"}), 404
 
-    # 🩵 use doctor.doctor_id (not doctor.id)
-    slot = TimeSlot.query.filter_by(slot_id=slot_id, doctor_id=doctor.doctor_id).first()
+    # ✅ Use integer doctor.id here
+    slot = TimeSlot.query.filter_by(slot_id=slot_id, doctor_id=doctor.id).first()
     if not slot:
-        print(f"❌ Slot {slot_id} not found for doctor.doctor_id={doctor.doctor_id}")
         return jsonify({"error": f"Slot {slot_id} not found or not owned by this doctor"}), 404
 
     db.session.delete(slot)
     db.session.commit()
-    print(f"🗑️ Deleted slot {slot_id} for doctor.doctor_id={doctor.doctor_id}")
     return jsonify({"message": f"Slot {slot_id} deleted successfully"}), 200
 
 # -----------------------------------------------------------
@@ -172,16 +170,23 @@ def delete_slot(user):
 @doctor_bp.route('/availability', methods=['GET'])
 @role_required('doctor')
 def get_availability(user):
-    slots = TimeSlot.query.filter_by(doctor_id=user.id).all()
+    # Find the doctor record linked to this user
+    doctor = Doctor.query.filter_by(id=user.id).first()
+    if not doctor:
+        return jsonify({"error": "Doctor not found"}), 404
+
+    # Query by doctor.id (integer FK)
+    slots = TimeSlot.query.filter_by(doctor_id=doctor.id).all()
+
     output = []
     for s in slots:
         output.append({
             "slot_id": s.slot_id,
-            "day": getattr(s, 'day', None),
             "start_time": s.start_time,
             "end_time": s.end_time,
             "is_available": s.is_available,
             "slot_type": s.slot_type,
             "hospital_id": s.hospital_id
         })
+
     return jsonify(output), 200
