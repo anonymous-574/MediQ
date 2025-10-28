@@ -145,12 +145,55 @@ def create_user(user):
 @admin_bp.route('/users/<int:user_id>', methods=['DELETE'])
 @role_required('admin')
 def delete_user(user, user_id):
-    u = User.query.get(user_id)
-    if not u:
-        return jsonify({"error": "User not found"}), 404
-    db.session.delete(u)
-    db.session.commit()
-    return jsonify({"message": "User deleted successfully"}), 200
+    """
+    Deletes a user and all related records (doctor, patient, appointments, etc.)
+    """
+    try:
+        from models import Appointment, Doctor, Patient, QueueReport, Room
+
+        # Fetch user
+        u = User.query.get(user_id)
+        if not u:
+            return jsonify({"error": "User not found"}), 404
+
+        # --- Delete related records based on role ---
+        if u.role == "doctor":
+            doctor = Doctor.query.filter_by(user_id=user_id).first()
+            if doctor:
+                # Delete all appointments linked to this doctor
+                Appointment.query.filter_by(doctor_id=doctor.id).delete()
+                # Optional: Delete any queue reports or rooms associated
+                QueueReport.query.filter_by(submitted_by=u.name).delete()
+                db.session.delete(doctor)
+
+        elif u.role == "patient":
+            patient = Patient.query.filter_by(user_id=user_id).first()
+            if patient:
+                # Delete all appointments linked to this patient
+                Appointment.query.filter_by(patient_id=patient.id).delete()
+                # Release any rooms occupied by this patient
+                Room.query.filter_by(patient_id=patient.id).update({
+                    "status": "available",
+                    "patient_id": None,
+                    "patient_name": None
+                })
+                db.session.delete(patient)
+
+        elif u.role == "nurse":
+            # Remove any queue reports submitted by nurse
+            QueueReport.query.filter_by(submitted_by=u.name).delete()
+
+        # --- Finally, delete the user ---
+        db.session.delete(u)
+        db.session.commit()
+
+        return jsonify({"message": f"User {u.name} and related records deleted successfully"}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print("Error deleting user:", e)
+        return jsonify({"error": str(e)}), 500
+
 
 
 # ========================= Approve Patient =========================

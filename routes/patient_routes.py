@@ -217,7 +217,7 @@ def queue_status(user):
 
 
 @patient_bp.route('/appointments/<appointment_id>', methods=['DELETE', 'OPTIONS'])
-@cross_origin(origins="http://localhost:3000")
+@role_required('patient')
 def cancel_appointment(appointment_id):
     # Allow unauthenticated preflight
     if request.method == 'OPTIONS':

@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from auth import role_required
 from models import Appointment, Doctor, Patient, TimeSlot
-from app import db
+from database import db
 import time
 from datetime import datetime
 
