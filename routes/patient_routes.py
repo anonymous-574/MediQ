@@ -217,7 +217,6 @@ def queue_status(user):
 
 
 @patient_bp.route('/appointments/<appointment_id>', methods=['DELETE', 'OPTIONS'])
-@role_required('patient')
 def cancel_appointment(user,appointment_id):
     # Allow unauthenticated preflight
     if request.method == 'OPTIONS':
