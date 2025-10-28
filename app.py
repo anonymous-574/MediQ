@@ -1,15 +1,20 @@
+
 from flask import Flask, jsonify
 from flask_cors import CORS
-from database import db  # ✅ Import db from database.py
+from database import db 
+from dotenv import load_dotenv
+import os
 
 def create_app():
+    load_dotenv()
     app = Flask(__name__)
-    CORS(app)
-    CORS(app, origins=["http://localhost:3000"]) 
-
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('SQLALCHEMY_DATABASE_URI', 'sqlite:///database.db')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['SECRET_KEY'] = 'super-secret-key'
+    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'fallback-secret-key')
+
+    # CORS setup
+    origins = os.getenv('CORS_ORIGINS', 'http://localhost:3000').split(',')
+    CORS(app, origins=origins)
     
     db.init_app(app)
     
@@ -41,7 +46,6 @@ def create_app():
 
     return app
 
-
+app = create_app()
 if __name__ == "__main__":
-    app = create_app()
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=False)
