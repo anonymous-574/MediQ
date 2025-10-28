@@ -2,11 +2,11 @@
 from flask import Flask, jsonify
 from flask_cors import CORS
 from database import db 
-
+from dotenv import load_dotenv
 import os
 
 def create_app():
-   
+    load_dotenv()
     app = Flask(__name__)
     app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('SQLALCHEMY_DATABASE_URI', 'sqlite:///database.db')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
