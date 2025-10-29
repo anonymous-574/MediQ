@@ -16,17 +16,17 @@ def view_analytics(user):
     data = []
 
     for h in hospitals:
-        # Total appointments for this hospital
+        
         appt_count = Appointment.query.filter_by(hospital_id=h.id).count()
 
-        # Average wait time from QueueReport
+        
         avg_wait = (
             db.session.query(func.avg(QueueReport.wait_time_reported))
             .filter_by(hospital_id=h.id)
             .scalar()
         ) or 0
 
-        # Latest congestion value
+        
         congestion = getattr(h, "current_congestion_level", 0)
 
         data.append({
@@ -152,7 +152,7 @@ def delete_user(user, user_id):
         if not u:
             return jsonify({"error": "User not found"}), 404
 
-        # === Doctor cleanup ===
+        
         if u.role == "doctor":
             if hasattr(Doctor, "user_id"):
                 doctor = Doctor.query.filter_by(user_id=user_id).first()
@@ -164,7 +164,7 @@ def delete_user(user, user_id):
                 QueueReport.query.filter_by(submitted_by=u.name).delete()
                 db.session.delete(doctor)
 
-        # === Patient cleanup ===
+       
         elif u.role == "patient":
             if hasattr(Patient, "user_id"):
                 patient = Patient.query.filter_by(user_id=user_id).first()
@@ -181,11 +181,11 @@ def delete_user(user, user_id):
                 QueueReport.query.filter_by(submitted_by=u.name).delete()
                 db.session.delete(patient)
 
-        # === Nurse cleanup ===
+        
         elif u.role == "nurse":
             QueueReport.query.filter_by(submitted_by=u.name).delete()
 
-        # === Delete user ===
+       
         db.session.delete(u)
         db.session.commit()
 
