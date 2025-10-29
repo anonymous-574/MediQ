@@ -17,7 +17,7 @@ def get_appointments(user):
     output = []
 
     for a in appts:
-        # Handle both string and datetime types safely
+       
         if isinstance(a.date_time, str):
             raw_time = a.date_time
         else:
@@ -28,7 +28,7 @@ def get_appointments(user):
             parts = raw_time.split()
             raw_time = parts[-1] if "T" in parts[-1] else parts[0]
 
-        # Normalize to ISO-like format
+        
         clean_time = raw_time.replace(" ", "T") if raw_time else None
 
         output.append({
@@ -66,7 +66,7 @@ def update_availability(user):
     data = request.get_json()
     timeslots = data if isinstance(data, list) else data.get('timeslots', [])
 
-    # ✅ user.id is the doctor's id (from user table, same as doctor.id)
+   
     doctor = Doctor.query.filter_by(id=user.id).first()
     if not doctor:
         return jsonify({"error": "Doctor not found"}), 404
@@ -89,10 +89,10 @@ def update_availability(user):
             start_dt = datetime.strptime(f"{date_str} {start_time_str}", "%Y-%m-%d %H:%M")
             end_dt = datetime.strptime(f"{date_str} {end_time_str}", "%Y-%m-%d %H:%M")
 
-            # ✅ Generate unique slot ID
+            
             slot_id = ts.get('slot_id') or f"TS-{user.id}-{int(time.time())}"
 
-            # ✅ Check for existing slot
+            
             existing = TimeSlot.query.filter_by(
                 slot_id=slot_id,
                 doctor_id=user.id
@@ -105,7 +105,7 @@ def update_availability(user):
                 })
                 continue
 
-            # ✅ Create new slot with doctor_id as INTEGER
+            
             slot = TimeSlot(
                 slot_id=slot_id,
                 doctor_id=user.id,  # INTEGER foreign key
@@ -148,7 +148,7 @@ def delete_slot(user):
     data = request.get_json(silent=True) or {}
     slot_id = data.get("slot_id")
 
-    # ✅ Use user.id directly (it's the doctor's id)
+   
     slot = TimeSlot.query.filter_by(slot_id=slot_id, doctor_id=user.id).first()
     if not slot:
         return jsonify({"error": f"Slot {slot_id} not found or not owned by this doctor"}), 404
@@ -163,12 +163,12 @@ def delete_slot(user):
 @doctor_bp.route('/availability', methods=['GET'])
 @role_required('doctor')
 def get_availability(user):
-    # ✅ Query slots by user.id (which is the doctor_id in time_slot table)
+   
     slots = TimeSlot.query.filter_by(doctor_id=user.id).all()
 
     output = []
     for s in slots:
-        # ✅ Format to match frontend expectations
+      
         if isinstance(s.start_time, str):
             start_dt = datetime.fromisoformat(s.start_time.replace('Z', '+00:00'))
             end_dt = datetime.fromisoformat(s.end_time.replace('Z', '+00:00'))
@@ -178,9 +178,9 @@ def get_availability(user):
         
         output.append({
             "slot_id": s.slot_id,
-            "date": start_dt.strftime("%Y-%m-%d"),           # ✅ Separate date field
-            "start_time": start_dt.strftime("%H:%M"),        # ✅ Time only
-            "end_time": end_dt.strftime("%H:%M"),            # ✅ Time only
+            "date": start_dt.strftime("%Y-%m-%d"),         
+            "start_time": start_dt.strftime("%H:%M"),       
+            "end_time": end_dt.strftime("%H:%M"),            
             "is_available": s.is_available,
             "slot_type": s.slot_type,
             "hospital_id": s.hospital_id
@@ -198,7 +198,7 @@ def get_available_slots(doctor_id):
     Get available time slots for a specific doctor on a specific date
     Used by patients when booking appointments
     """
-    # Get the date from query parameters
+   
     date_str = request.args.get('date')
     if not date_str:
         return jsonify({"error": "Date parameter is required"}), 400
@@ -209,8 +209,7 @@ def get_available_slots(doctor_id):
     except ValueError:
         return jsonify({"error": "Invalid date format. Use YYYY-MM-DD"}), 400
     
-    # Query time slots for this doctor on this date
-    # Filter by date range (start of day to end of day)
+   
     start_of_day = datetime.combine(target_date, datetime.min.time())
     end_of_day = datetime.combine(target_date, datetime.max.time())
     
@@ -223,7 +222,7 @@ def get_available_slots(doctor_id):
     
     available_slots = []
     for slot in slots:
-        # Format datetime objects to ISO strings for frontend
+       
         if isinstance(slot.start_time, str):
             start_dt = datetime.fromisoformat(slot.start_time.replace('Z', '+00:00'))
             end_dt = datetime.fromisoformat(slot.end_time.replace('Z', '+00:00'))
@@ -233,8 +232,8 @@ def get_available_slots(doctor_id):
         
         available_slots.append({
             "slot_id": slot.slot_id,
-            "start_time": start_dt.isoformat(),  # ISO format for formatTime() function
-            "end_time": end_dt.isoformat(),      # ISO format for formatTime() function
+            "start_time": start_dt.isoformat(),  
+            "end_time": end_dt.isoformat(),      
             "date": start_dt.strftime("%Y-%m-%d"),
             "is_available": slot.is_available,
             "slot_type": slot.slot_type
@@ -258,7 +257,7 @@ def get_doctor_patients(user):
     """
     from sqlalchemy import distinct
     
-    # Get distinct patient IDs from appointments
+   
     patient_ids = db.session.query(distinct(Appointment.patient_id)).filter(
         Appointment.doctor_id == user.id
     ).all()
@@ -267,15 +266,15 @@ def get_doctor_patients(user):
     for (patient_id,) in patient_ids:
         patient = Patient.query.filter_by(id=patient_id).first()
         if patient:
-            user_info = patient.user  # Get related user info
+            user_info = patient.user 
             
-            # Count appointments
+           
             total_appointments = Appointment.query.filter_by(
                 patient_id=patient_id,
                 doctor_id=user.id
             ).count()
             
-            # Get last visit
+            
             last_appointment = Appointment.query.filter_by(
                 patient_id=patient_id,
                 doctor_id=user.id
