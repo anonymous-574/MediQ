@@ -91,18 +91,18 @@ def list_patient_appointments(user):
 
     data = []
     for a in appointments:
-        # ✅ Try to resolve hospital properly
+        
         hospital = a.hospital
         if not hospital:
-            # fallback: hospital_id might be string like "HOSP-1"
+            
             hospital = Hospital.query.filter_by(hospital_id=str(a.hospital_id)).first()
 
-        # ✅ Normalize date format
+      
         date_str = None
         if hasattr(a.date_time, "isoformat"):
             date_str = a.date_time.isoformat()
         else:
-            # Clean up if stored as string like "2025-10-31 2025-10-31T11:00:00"
+            
             parts = str(a.date_time).split()
             date_str = parts[-1] if len(parts) > 1 else parts[0]
 
